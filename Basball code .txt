@@ -1,0 +1,156 @@
+library(RMySQL)
+drv <- dbDriver("MySQL")
+db <- dbConnect(drv, user="root", dbname = "lahman2016", host="127.0.0.1")
+dbListTables(db)
+SELECT yearID, playerID, teamID, hr
+FROM Batting
+WHERE yearID = 1980
+ORDER BY HR DESC
+LIMIT 10
+SELECT yearID AS year, playerID, teamID, H AS Hits, AB AS At_Bats, (H/AB) AS Batting_Average
+FROM Batting
+WHERE yearID = 1980 AND AB > 400
+ORDER BY Batting_Average DESC
+LIMIT 10
+SELECT yearID, CONCAT(nameFirst, " ", nameLast) AS fullName, teamID, hr
+FROM Batting
+JOIN MASTER
+ON Batting.playerID = MASTER.playerID
+WHERE yearID = 1980
+ORDER BY HR DESC
+LIMIT 10
+SELECT hrtop10.yearID, hrtop10.fullName, Teams.name as teamName, hrtop10.hr
+FROM (SELECT yearID, CONCAT(nameFirst, " ", nameLast) AS fullName, teamID, hr
+      FROM Batting
+      JOIN MASTER
+      ON Batting.playerID = MASTER.playerID
+      WHERE yearID = 1980
+      ORDER BY HR DESC
+      LIMIT 10) hrtop10 /*table alias*/
+JOIN Teams 
+ON hrtop10.teamID = Teams.teamID AND hrtop10.yearID = Teams.yearID
+WHERE hrtop10.yearID = 1980
+ORDER BY hrtop10.hr DESC
+SELECT batop10.yearID AS year, batop10.fullName, Teams.name as teamName, batop10.H AS Hits, batop10.AB AS At_Bats, batop10.Batting_Average
+FROM (SELECT yearID, CONCAT(nameFirst, " ", nameLast) AS fullName, teamID, H, AB, (H/AB) AS Batting_Average
+      FROM Batting
+      JOIN MASTER
+      ON Batting.playerID = MASTER.playerID
+      WHERE yearID = 1980 AND AB > 400
+      ORDER BY Batting_Average DESC
+      LIMIT 10) batop10 /*table alias*/
+JOIN Teams 
+ON batop10.teamID = Teams.teamID AND batop10.yearID = Teams.yearID
+WHERE batop10.yearID = 1980
+ORDER BY batop10.Batting_Average DESC
+SELECT batter1980.playerID
+FROM  (SELECT playerID FROM Batting WHERE yearID = 1980) batter1980
+JOIN (SELECT DISTINCT(playerID) FROM Fielding WHERE yearID = 1980 AND Pos <> "P") notPitcher1980
+ON batter1980.playerID = notPitcher1980.playerID
+SELECT DISTINCT(CONCAT(nameFirst, " ", nameLast)) AS fullName, hof1980Batting.Percentage_of_votes_received, hof1980Batting.yearInducted
+FROM (SELECT batterNotPitcher1980.playerID, hof.Percentage_of_votes_received, hof.yearInducted
+      FROM (SELECT batter1980.playerID
+            FROM  (SELECT playerID FROM Batting WHERE yearID = 1980) batter1980
+            JOIN (SELECT DISTINCT(playerID) FROM Fielding WHERE yearID = 1980 AND Pos <> "P") notPitcher1980
+            ON batter1980.playerID = notPitcher1980.playerID) batterNotPitcher1980
+      JOIN (SELECT 100.0*(votes/ballots) AS Percentage_of_votes_received, playerID, yearID AS yearInducted FROM HallOfFame WHERE inducted = "Y") hof
+      ON hof.playerID = batterNotPitcher1980.playerID
+      ORDER BY hof.Percentage_of_votes_received DESC) hof1980Batting
+JOIN MASTER
+ON hof1980Batting.playerID = MASTER.playerID
+ORDER BY hof1980Batting.Percentage_of_votes_received DESC
+SELECT DISTINCT(CONCAT(nameFirst, " ", nameLast)) AS fullName, hof1980Pitching.Percentage_of_votes_received, hof1980Pitching.yearInducted
+FROM (SELECT pitcherNotBatter1980.playerID, hof.Percentage_of_votes_received, hof.yearInducted
+      FROM (SELECT pitcher1980.playerID
+            FROM  (SELECT playerID FROM Pitching WHERE yearID = 1980) pitcher1980
+            JOIN (SELECT DISTINCT(playerID) FROM Fielding WHERE yearID = 1980 AND Pos = "P") onlyPitcher1980
+            ON pitcher1980.playerID = onlyPitcher1980.playerID) pitcherNotBatter1980
+      JOIN (SELECT 100.0*(votes/ballots) AS Percentage_of_votes_received, playerID, yearID AS yearInducted FROM HallOfFame WHERE inducted = "Y") hof
+      ON hof.playerID = pitcherNotBatter1980.playerID
+      ORDER BY hof.Percentage_of_votes_received DESC) hof1980Pitching
+JOIN MASTER
+ON hof1980Pitching.playerID = MASTER.playerID
+ORDER BY hof1980Pitching.Percentage_of_votes_received DESC
+SELECT hr1980.playerID, hr1980.hr, pos1980.Pos
+FROM (SELECT playerID, hr FROM Batting WHERE yearID = 1980) hr1980
+JOIN (SELECT playerID, Pos FROM Fielding WHERE yearID = 1980 ) pos1980
+ON hr1980.playerID = pos1980.playerID
+SELECT MAX(hr1980.hr) as max_hr, pos1980.Pos
+FROM (SELECT playerID, hr FROM Batting WHERE yearID = 1980) hr1980
+JOIN (SELECT playerID, Pos FROM Fielding WHERE yearID = 1980 ) pos1980
+ON hr1980.playerID = pos1980.playerID
+GROUP BY pos1980.Pos
+SELECT playerID, posTable.hr as home_runs, posTable.Pos as Position
+FROM (SELECT hr1980.playerID, hr1980.hr, pos1980.Pos
+      FROM (SELECT playerID, hr FROM Batting WHERE yearID = 1980) hr1980
+      JOIN (SELECT playerID, Pos FROM Fielding WHERE yearID = 1980 ) pos1980
+      ON hr1980.playerID = pos1980.playerID) posTable
+JOIN (SELECT MAX(hr1980.hr) as max_hr, pos1980.Pos
+      FROM (SELECT playerID, hr FROM Batting WHERE yearID = 1980) hr1980
+      JOIN (SELECT playerID, Pos FROM Fielding WHERE yearID = 1980 ) pos1980
+      ON hr1980.playerID = pos1980.playerID
+      GROUP BY pos1980.Pos) posTableMax
+ON posTable.Pos = posTableMax.Pos AND posTable.hr = posTableMax.max_hr
+SELECT DISTINCT(CONCAT(nameFirst, " ", nameLast)) AS fullName, home_runs, Position
+FROM (SELECT playerID, posTable.hr as home_runs, posTable.Pos as Position
+      FROM (SELECT hr1980.playerID, hr1980.hr, pos1980.Pos
+            FROM (SELECT playerID, hr FROM Batting WHERE yearID = 1980) hr1980
+            JOIN (SELECT playerID, Pos FROM Fielding WHERE yearID = 1980 ) pos1980
+            ON hr1980.playerID = pos1980.playerID) posTable
+      JOIN (SELECT MAX(hr1980.hr) as max_hr, pos1980.Pos
+            FROM (SELECT playerID, hr FROM Batting WHERE yearID = 1980) hr1980
+            JOIN (SELECT playerID, Pos FROM Fielding WHERE yearID = 1980 ) pos1980
+            ON hr1980.playerID = pos1980.playerID
+            GROUP BY pos1980.Pos) posTableMax
+      ON posTable.Pos = posTableMax.Pos AND posTable.hr = posTableMax.max_hr) maxHrByPosition
+JOIN MASTER
+ON MASTER.playerID = maxHrByPosition.playerID
+ORDER BY maxHrByPosition.home_runs DESC
+SELECT MAX(hrEighties.hr) as max_hr, yearID
+FROM (SELECT yearID, playerID, hr FROM Batting WHERE yearID > 1979 AND yearID < 1990) hrEighties
+GROUP BY yearID
+SELECT yearID, playerID, teamID, hr FROM Batting WHERE yearID > 1979 AND yearID < 1990
+SELECT hrEightiesTable.yearID as year, playerID, teamID, hrEightiesTable.hr
+FROM (SELECT yearID, playerID, teamID, hr FROM Batting WHERE yearID > 1979 AND yearID < 1990) hrEightiesTable
+JOIN (SELECT MAX(hrEighties.hr) as max_hr, yearID
+      FROM (SELECT yearID, playerID, hr FROM Batting WHERE yearID > 1979 AND yearID < 1990) hrEighties
+      GROUP BY yearID) hrEightiesTableMax
+ON hrEightiesTable.yearID = hrEightiesTableMax.yearID AND hrEightiesTable.hr = hrEightiesTableMax.max_hr
+SELECT hrEightiesTable.lgID as league, hrEightiesTable.yearID as year, playerID, teamID, hrEightiesTable.hr
+FROM (SELECT lgID, yearID, playerID, teamID, hr FROM Batting WHERE yearID > 1979 AND yearID < 1990) hrEightiesTable
+JOIN (SELECT MAX(hrEighties.hr) as max_hr, lgID, yearID
+      FROM (SELECT lgID, yearID, playerID, hr FROM Batting WHERE yearID > 1979 AND yearID < 1990) hrEighties
+      GROUP BY lgID, yearID) hrEightiesTableMax
+ON hrEightiesTable.lgID = hrEightiesTableMax.lgID AND hrEightiesTable.yearID = hrEightiesTableMax.yearID AND hrEightiesTable.hr = hrEightiesTableMax.max_hr
+ORDER BY hrEightiesTable.yearID, hrEightiesTable.lgID
+SELECT playerID, teamID, hr, G
+FROM Batting WHERE yearID=1980 AND playerID = “thompja01"
+SELECT b1980.hr_sum AS hr, MASTER.bats
+FROM (SELECT playerID, sum(hr) as hr_sum
+      FROM Batting
+      WHERE yearID = 1980 AND G > 99
+      GROUP BY playerID) b1980
+JOIN MASTER
+ON b1980.playerID = MASTER.playerID
+batPref1980 <- dbGetQuery(db,"SELECT b1980.hr_sum AS hr, MASTER.bats
+                              FROM (SELECT playerID, sum(hr) as hr_sum
+                                    FROM Batting
+                                    WHERE yearID = 1980 AND G > 99
+                                    GROUP BY playerID) b1980
+                              JOIN MASTER
+                              ON b1980.playerID = MASTER.playerID")batPref1980$bats <- as.factor(batPref1980$bats)
+summary(batPref1980)library(rbokeh)
+figure(title = "Home runs hit vs batting preference in 1980", width = 600, xlab = "Batting preference", ylab = "Home runs") %>%  ly_boxplot(x=bats, y=hr, data = batPref1980, fill_color = "#56B4E9", line_color = "black", fill_alpha=1, width = 0.4)SELECT CONCAT(nameFirst, " ", nameLast) AS fullName, bats
+FROM (SELECT playerID FROM Batting WHERE yearID = 1980 AND hr > 30) studs1980
+JOIN MASTER ON MASTER.playerID = studs1980.playerID
+WHERE MASTER.bats = "B"SELECT name AS team, attendance, lgID as league, divID AS division FROM Teams WHERE yearID = 1980attendance_1980 <- dbGetQuery(db, "SELECT name AS team, attendance, lgID as league, divID AS division 
+                          FROM Teams WHERE yearID = 1980")
+# Changing attendance, which is read as a string, to numeric 
+attendance_1980$attendance <- as.numeric(attendance_1980$attendance)
+# Changing the "E" and "W" in division to "East" and "West"
+attendance_1980$division[attendance_1980$division == "E"] <- "East"
+attendance_1980$division[attendance_1980$division == "W"] <- "West"
+# Creating a "league_division" column
+attendance_1980$league_division <- paste(attendance_1980$league, attendance_1980$division)
+summary(attendance_1980)figure(width=600, title = "Ballpark attendance in 1980", xlab = "League division", ylab = "Ballpark attendance") %>% ly_boxplot(x = league_division, y = attendance, data = attendance_1980, fill_color = "#56B4E9", line_color = "black", fill_alpha=1, width = 0.4) %>% y_axis(number_formatter = "numeral")library(treemap)
+treemap(attendance_1980, index=c("league_division", "team"), vSize = "attendance", palette = c("#E69F00", "#56B4E9", "#009E73", "#CC79A7"), title = "Ballpark attendance by league division", title.legend = "League division", position.legend = "bottom")
